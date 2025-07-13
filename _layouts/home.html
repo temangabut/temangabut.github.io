@@ -18,7 +18,7 @@ layout: default
         {%- assign img_split = post.content | split:'<img' -%}
         {%- assign img_tag = img_split[1] | prepend:'<img' -%}
         {%- assign src_split = img_tag | split:'src="' -%}
-        {%- assign src_url = src_split[1] | split:'"' | first | default: '/assets/default.jpg' -%}
+        {%- assign src_url = src_split[1] | split:'"' | first | default: '//3.bp.blogspot.com/-ltyYh4ysBHI/U04MKlHc6pI/AAAAAAAADQo/PFxXaGZu9PQ/s66-c/no-image.png' -%}
 
         <li style="display: flex; margin-bottom: 1.5rem;">
           <div class="thumb" style="flex: 0 0 120px; margin-right: 1rem;">
