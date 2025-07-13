@@ -7,7 +7,7 @@ layout: default
     <h1 class="page-heading">{{ page.title }}</h1>
   {%- endif -%}
 {{ content }}
-  {%- if paginator.posts.size > 0 -%}
+    {% for post in paginator.posts %}
     <h2 class="post-list-heading">{{ page.list_title | default: "Posts" }}</h2>
     <ul class="post-list" style="list-style: none; padding: 0;">
       {%- for post in paginator.posts -%}
@@ -42,17 +42,17 @@ layout: default
       {%- endfor -%}
     </ul>
 
-    <nav class="pagination" role="navigation" style="display: flex; justify-content: center; gap: 1rem; margin-top: 2rem;">
-      {%- if paginator.previous_page -%}
-        <a href="{{ paginator.previous_page_path | relative_url }}">&laquo; Prev</a>
-      {%- endif -%}
+    <p style="text-align:center">
+  {% if paginator.previous_page %}
+    <a href="{{ paginator.previous_page_path }}">« Sebelumnya</a>
+  {% endif %}
 
-      <span>Page {{ paginator.page }} of {{ paginator.total_pages }}</span>
+  Halaman {{ paginator.page }} dari {{ paginator.total_pages }}
 
-      {%- if paginator.next_page -%}
-        <a href="{{ paginator.next_page_path | relative_url }}">Next &raquo;</a>
-      {%- endif -%}
-    </nav>
+  {% if paginator.next_page %}
+    <a href="{{ paginator.next_page_path }}">Berikutnya »</a>
+  {% endif %}
+</p>
 
     <p class="rss-subscribe" style="text-align: center;">subscribe <a href="{{ "/feed.xml" | relative_url }}">via RSS</a></p>
   {%- endif -%}
