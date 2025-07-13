@@ -12,7 +12,7 @@ layout: default
     <h2 class="post-list-heading">{{ page.list_title | default: "Posts" }}</h2>
     <ul class="post-list" style="list-style: none; padding: 0;">
       
-      {%- for post in paginator.posts -%}
+      {%- for post in paginator.download.posts -%}
         {%- assign date_format = site.minima.date_format | default: "%b %-d, %Y" -%}
         
         {%- assign src_url = '//3.bp.blogspot.com/-ltyYh4ysBHI/U04MKlHc6pI/AAAAAAAADQo/PFxXaGZu9PQ/s66-c/no-image.png' -%}
