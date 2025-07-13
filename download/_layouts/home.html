@@ -1,0 +1,46 @@
+---
+layout: default
+---
+
+<div class="home">
+  {%- if page.title -%}
+    <h1 class="page-heading">{{ page.title }}</h1>
+  {%- endif -%}
+
+  {{ content }}
+
+  {%- if site.posts.size > 0 -%}
+    <h2 class="post-list-heading">{{ page.list_title | default: "Posts" }}</h2>
+    <ul class="post-list" style="list-style: none; padding: 0;">
+      {%- for post in site.posts -%}
+        {%- assign date_format = site.minima.date_format | default: "%b %-d, %Y" -%}
+        
+        {%- assign img_split = post.content | split:'<img' -%}
+        {%- assign img_tag = img_split[1] | prepend:'<img' -%}
+        {%- assign src_split = img_tag | split:'src="' -%}
+        {%- assign src_url = src_split[1] | split:'"' | first | default: '/assets/default.jpg' -%}
+
+        <li style="display: flex; margin-bottom: 1.5rem;">
+          <div class="thumb" style="flex: 0 0 120px; margin-right: 1rem;">
+            <a href="{{ post.url | relative_url }}">
+              <img src="{{ src_url }}" alt="Thumbnail" style="width: 100%; height: auto; object-fit: cover; border-radius: 8px;">
+            </a>
+          </div>
+          <div class="post-info" style="flex: 1;">
+            <span class="post-meta" style="color: #777;">{{ post.date | date: date_format }}</span>
+            <h3 style="margin: 0;">
+              <a class="post-link" href="{{ post.url | relative_url }}" style="text-decoration: none; color: inherit;">
+                {{ post.title | escape }}
+              </a>
+            </h3>
+            {%- if site.show_excerpts -%}
+              <div class="excerpt" style="color: #444;">{{ post.excerpt }}</div>
+            {%- endif -%}
+          </div>
+        </li>
+      {%- endfor -%}
+    </ul>
+
+    <p class="rss-subscribe">subscribe <a href="{{ "/feed.xml" | relative_url }}">via RSS</a></p>
+  {%- endif -%}
+</div>
