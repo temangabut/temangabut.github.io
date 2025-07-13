@@ -33,9 +33,13 @@ layout: default
                 {{ post.title | escape }}
               </a>
             </h3>
-            {%- if site.show_excerpts -%}
-              <div class="excerpt" style="color: #444;">{{ post.excerpt }}</div>
-            {%- endif -%}
+            {%- if site.show_excerpts and post.excerpt -%}
+  {% assign words = post.excerpt | strip_html | strip_newlines | split: ' ' %}
+  <div class="excerpt" style="color: #444;">
+    {{ words | slice: 0, 20 | join: ' ' }}{% if words.size > 20 %}...{% endif %}
+  </div>
+{%- endif -%}
+
           </div>
         </li>
       {%- endfor -%}
