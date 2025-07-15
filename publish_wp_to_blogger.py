@@ -10,7 +10,7 @@ import markdown
 import google.generativeai as genai
 
 # --- Konfigurasi ---
-API_BASE_URL = "https://ngesex.org/wp-json/wp/v2/posts"
+API_BASE_URL = "https://ngocoks.com/wp-json/wp/v2/posts"
 STATE_FILE = 'published_posts.json' # File untuk melacak postingan yang sudah diterbitkan
 
 # --- Konfigurasi Gemini API ---
