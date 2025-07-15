@@ -10,7 +10,8 @@ import markdown
 import google.generativeai as genai
 
 # --- Konfigurasi ---
-API_BASE_URL = "https://ngocoks.com/wp-json/wp/v2/posts"
+# INI ADALAH URL API WORDPRESS SELF-HOSTED KAMU YANG KITA FOKUSKAN
+API_BASE_URL = "https://ngesex.org/wp-json/wp/v2/posts"
 STATE_FILE = 'published_posts.json' # File untuk melacak postingan yang sudah diterbitkan
 
 # --- Konfigurasi Gemini API ---
@@ -18,7 +19,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY environment variable not set. Please set it in your GitHub Secrets or local environment.")
 genai.configure(api_key=GEMINI_API_KEY)
-gemini_model = genai.GenerativeModel("gemini-1.5-flash") # Specify the model here
+gemini_model = genai.GenerativeModel("gemini-1.5-flash") # Menentukan model secara eksplisit
 
 # --- Konfigurasi Blogger ---
 BLOGGER_BLOG_ID = os.getenv("BLOGGER_BLOG_ID")
@@ -195,40 +196,66 @@ def publish_post_to_blogger(blogger_service, blog_id, title, content_markdown, t
         print(f"Error details: {e.args}") # Tambahkan ini untuk debugging lebih lanjut
         return None
 
-# === Ambil semua postingan dari WordPress Self-Hosted REST API ===
+# === Ambil semua postingan dari WordPress Self-Hosted REST API (Diadaptasi dari versi yang kamu bilang berhasil) ===
 def fetch_all_and_process_posts():
     """
     Mengambil semua postingan dari WordPress self-hosted REST API, membersihkan HTML,
     dan menerapkan penggantian kata khusus.
     """
     all_posts_raw = []
-    page = 1
-    per_page_limit = 100 # Maksimal 100 per permintaan untuk WP REST API
+    page = 1 # Untuk WordPress self-hosted, kita pakai 'page'
+    per_page_limit = 100 # Maksimal per halaman
 
     print("📥 Mengambil semua artikel dari WordPress self-hosted REST API...")
 
+    # Tambahkan headers untuk User-Agent agar lebih "sopan" ke server
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+
     while True:
         params = {
-            'per_page': per_page_limit,
-            'page': page,
-            'status': 'publish', # Hanya ambil yang sudah dipublikasikan
-            '_fields': 'id,title,content,excerpt,categories,tags,date,featured_media'
+            'per_page': per_page_limit, # WordPress self-hosted pakai 'per_page'
+            'page': page,               # WordPress self-hosted pakai 'page'
+            'status': 'publish',        # Hanya ambil yang sudah dipublikasikan
+            '_fields': 'id,title,content,excerpt,categories,tags,date,featured_media' # Field yang ingin diambil
         }
-        res = requests.get(API_BASE_URL, params=params)
+        try:
+            # Menggunakan timeout untuk mencegah request gantung terlalu lama
+            res = requests.get(API_BASE_URL, params=params, headers=headers, timeout=30)
+            
+            # Cek status code dan pesan error spesifik dari WordPress self-hosted API
+            if res.status_code == 400:
+                # Ini adalah error yang spesifik dari WP self-hosted jika halaman habis
+                if "rest_post_invalid_page_number" in res.text:
+                    print(f"Reached end of posts from WordPress API (page {page} does not exist). Stopping fetch.")
+                    break # KELUAR DARI LOOP KARENA SEMUA HALAMAN SUDAH DIAMBIL
+                else:
+                    # Jika 400 tapi bukan invalid_page_number, ini adalah error 400 yang lain
+                    raise Exception(f"Error: Gagal mengambil data dari WordPress REST API: {res.status_code} - {res.text}. "
+                                    f"Pastikan URL API Anda benar dan dapat diakses.")
+            elif res.status_code != 200:
+                # Jika status code lain selain 200 (sukses) atau 400 (invalid page), lempar error umum
+                raise Exception(f"Error: Gagal mengambil data dari WordPress REST API: {res.status_code} - {res.text}. "
+                                f"Pastikan URL API Anda benar dan dapat diakses.")
 
-        if res.status_code != 200:
-            print(f"Error: Gagal mengambil data dari WordPress REST API: {res.status_code} - {res.text}")
-            raise Exception(f"Gagal mengambil data dari WordPress REST API: {res.status_code} - {res.text}. "
-                            f"Pastikan URL API Anda benar dan dapat diakses.")
+            posts_batch = res.json()
 
-        posts_batch = res.json()
+            if not posts_batch:
+                # Ini adalah kondisi standar jika API mengembalikan array kosong di akhir
+                print(f"Fetched empty batch on page {page}. Stopping fetch.")
+                break
 
-        if not posts_batch:
-            break
+            all_posts_raw.extend(posts_batch)
+            page += 1
+            time.sleep(0.5) # Beri jeda antar permintaan agar tidak membebani server
 
-        all_posts_raw.extend(posts_batch)
-        page += 1
-        time.sleep(0.5) # Beri jeda antar permintaan agar tidak membebani server
+        except requests.exceptions.Timeout:
+            print(f"Timeout: Permintaan ke WordPress API di halaman {page} habis waktu. Mungkin ada masalah jaringan atau server lambat.")
+            break # Berhenti jika ada timeout, bisa coba lagi nanti
+        except requests.exceptions.RequestException as e:
+            print(f"Network Error: Gagal terhubung ke WordPress API di halaman {page}: {e}. Cek koneksi atau URL.")
+            break # Berhenti jika ada masalah jaringan/koneksi
 
     processed_posts = []
     for post in all_posts_raw:
@@ -245,7 +272,7 @@ def fetch_all_and_process_posts():
         content_after_replacements = replace_custom_words(cleaned_formatted_content)
 
         post['raw_cleaned_content'] = content_after_replacements
-        post['id'] = post.get('id')
+        post['id'] = post.get('id') # Menggunakan 'id' (huruf kecil) untuk WordPress self-hosted
         processed_posts.append(post)
 
     return processed_posts
@@ -276,6 +303,7 @@ if __name__ == '__main__':
             exit()
 
         # 4. Urutkan postingan yang belum diterbitkan dari yang TERBARU
+        # Pastikan format tanggal cocok untuk datetime.fromisoformat
         unpublished_posts.sort(key=lambda x: datetime.datetime.fromisoformat(x['date'].replace('Z', '+00:00')), reverse=True)
 
         # 5. Pilih satu postingan untuk diterbitkan hari ini
@@ -300,7 +328,7 @@ if __name__ == '__main__':
             print("Skipping Blogger publishing: BLOGGER_BLOG_ID or Blogger service not configured/initialized.")
 
         # 8. Tambahkan ID postingan ke daftar yang sudah diterbitkan dan simpan state
-        published_ids.add(str(post_to_publish['id']))
+        published_ids.add(str(post_to_publish['id'])) # Menggunakan 'id' (huruf kecil)
         save_published_posts_state(published_ids)
         print(f"✅ State file '{STATE_FILE}' diperbarui.")
 
