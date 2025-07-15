@@ -4,10 +4,11 @@ import re
 import json
 import datetime
 import time
-from google.oauth2 import service_account
+from google.oauth2.credentials import Credentials # Mengganti service_account
 from googleapiclient.discovery import build
 import markdown
 import google.generativeai as genai
+from google.auth.transport.requests import Request # Diperlukan untuk refresh token
 
 # --- Konfigurasi ---
 # INI ADALAH URL API WORDPRESS SELF-HOSTED KAMU YANG KITA FOKUSKAN
@@ -21,9 +22,12 @@ if not GEMINI_API_KEY:
 genai.configure(api_key=GEMINI_API_KEY)
 gemini_model = genai.GenerativeModel("gemini-1.5-flash") # Menentukan model secara eksplisit
 
-# --- Konfigurasi Blogger ---
+# --- Konfigurasi Blogger (Menggunakan OAuth 2.0) ---
 BLOGGER_BLOG_ID = os.getenv("BLOGGER_BLOG_ID")
-# GOOGLE_APPLICATION_CREDENTIALS_JSON_STRING akan dibaca dari environment variable di workflow GitHub Actions.
+# Variabel lingkungan baru untuk OAuth 2.0
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+GOOGLE_REFRESH_TOKEN = os.getenv("GOOGLE_REFRESH_TOKEN")
 
 # --- Penggantian Kata Khusus ---
 REPLACEMENT_MAP = {
@@ -148,22 +152,42 @@ def save_published_posts_state(published_ids):
     with open(STATE_FILE, 'w') as f:
         json.dump(list(published_ids), f)
 
-# === Inisialisasi Layanan Blogger ===
-def get_blogger_service():
+# === Inisialisasi Layanan Blogger dengan OAuth 2.0 ===
+def get_blogger_service_with_oauth():
     """
-    Menginisialisasi dan mengembalikan objek layanan Blogger API.
-    Menggunakan Service Account untuk otentikasi dari string JSON di env var.
+    Menginisialisasi dan mengembalikan objek layanan Blogger API menggunakan OAuth 2.0
+    dengan refresh token.
     """
-    creds_json_str = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON_STRING")
-    if not creds_json_str:
-        raise ValueError("GOOGLE_APPLICATION_CREDENTIALS_JSON_STRING environment variable not set.")
+    # Pastikan variabel lingkungan untuk OAuth sudah disetel
+    if not all([GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN]):
+        raise ValueError(
+            "GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, dan GOOGLE_REFRESH_TOKEN "
+            "variabel lingkungan harus disetel untuk otentikasi OAuth."
+        )
 
-    creds_info = json.loads(creds_json_str)
+    # Ini adalah endpoint standar Google OAuth 2.0
+    token_uri = 'https://oauth2.googleapis.com/token'
+    scopes = ['https://www.googleapis.com/auth/blogger']
 
-    creds = service_account.Credentials.from_service_account_info(
-        creds_info,
-        scopes=['https://www.googleapis.com/auth/blogger']
+    # Buat objek kredensial menggunakan refresh token yang sudah ada
+    creds = Credentials(
+        token=None,  # Token akses akan di-refresh secara otomatis
+        refresh_token=GOOGLE_REFRESH_TOKEN,
+        token_uri=token_uri,
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        scopes=scopes
     )
+
+    # Paksa refresh untuk mendapatkan token akses awal atau memperbarui yang sudah kedaluwarsa
+    # Objek Request() dari google.auth.transport.requests diperlukan di sini
+    try:
+        creds.refresh(Request())
+    except Exception as e:
+        print(f"❌ Gagal me-refresh token akses: {e}")
+        print("Pastikan GOOGLE_REFRESH_TOKEN Anda valid dan belum dicabut.")
+        raise
+
     service = build('blogger', 'v3', credentials=creds)
     return service
 
@@ -216,8 +240,8 @@ def fetch_all_and_process_posts():
     while True:
         params = {
             'per_page': per_page_limit, # WordPress self-hosted pakai 'per_page'
-            'page': page,               # WordPress self-hosted pakai 'page'
-            'status': 'publish',        # Hanya ambil yang sudah dipublikasikan
+            'page': page,                # WordPress self-hosted pakai 'page'
+            'status': 'publish',         # Hanya ambil yang sudah dipublikasikan
             '_fields': 'id,title,content,excerpt,categories,tags,date,featured_media' # Field yang ingin diambil
         }
         try:
@@ -318,14 +342,14 @@ if __name__ == '__main__':
             post_to_publish['raw_cleaned_content']
         )
 
-        # 6. Inisialisasi layanan Blogger
-        blogger_service = get_blogger_service()
+        # 6. Inisialisasi layanan Blogger menggunakan OAuth 2.0
+        blogger_service = get_blogger_service_with_oauth() # Mengganti panggilan fungsi
 
         # 7. Terbitkan ke Blogger
         if blogger_service and BLOGGER_BLOG_ID:
             publish_post_to_blogger(blogger_service, BLOGGER_BLOG_ID, post_to_publish['processed_title'], final_processed_content)
         else:
-            print("Skipping Blogger publishing: BLOGGER_BLOG_ID or Blogger service not configured/initialized.")
+            print("Skipping Blogger publishing: BLOGGER_BLOG_ID atau layanan Blogger tidak dikonfigurasi/diinisialisasi.")
 
         # 8. Tambahkan ID postingan ke daftar yang sudah diterbitkan dan simpan state
         published_ids.add(str(post_to_publish['id'])) # Menggunakan 'id' (huruf kecil)
