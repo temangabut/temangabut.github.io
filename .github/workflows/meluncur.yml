@@ -2,9 +2,11 @@ name: Auto Publish WP to Blogger Daily
 
 on:
   schedule:
-    - cron: '0 0 * * *' # Jalan setiap hari pada tengah malam UTC (jam 7 pagi WIB)
-                       # Sesuaikan '0 0 * * *' jika kamu ingin waktu lain.
-                       # Contoh: '0 7 * * *' untuk jam 7 pagi UTC (jam 2 siang WIB)
+    # Runs every day at 00:00 UTC (7:00 AM WIB, mengingat Sukabumi GMT+7)
+    # Sesuaikan '0 0 * * *' jika kamu ingin waktu lain dalam format Cron.
+    # Contoh: '0 7 * * *' untuk jam 7 pagi UTC (jam 2 siang WIB)
+    - cron: '0 0 * * *'
+
   workflow_dispatch: # Memungkinkan kamu menjalankan workflow secara manual dari tab Actions di GitHub
 
 jobs:
@@ -21,17 +23,22 @@ jobs:
 
     - name: Install dependencies
       run: |
-        pip install -r requirements.txt
+        python -m pip install --upgrade pip # Pastikan pip terbaru
+        pip install -r requirements.txt      # Instal semua dependensi dari requirements.txt
 
     - name: Run script to publish to Blogger
       env:
-        # Rahasia ini harus kamu tambahkan di Settings -> Secrets -> Actions di repo GitHub-mu
+        # Rahasia ini HARUS kamu tambahkan di Settings -> Secrets -> Actions di repo GitHub-mu.
+        # Ingat, GANTI DARI SERVICE ACCOUNT KE OAUTH 2.0 SECRETS!
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         BLOGGER_BLOG_ID: ${{ secrets.BLOGGER_BLOG_ID }}
-        GOOGLE_APPLICATION_CREDENTIALS_JSON_STRING: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
-      run: python publish_wp_to_blogger.py # Ganti dengan nama file script Python-mu jika berbeda
+        GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}         # Baru untuk OAuth
+        GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }} # Baru untuk OAuth
+        GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }} # Baru untuk OAuth
+      run: python publish_wp_to_blogger.py # Sudah disesuaikan dengan nama file-mu
 
     - name: Commit and push updated published_posts.json
+      # Ini penting untuk menyimpan state postingan yang sudah diterbitkan
       run: |
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
