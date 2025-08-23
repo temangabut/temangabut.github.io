@@ -1,3 +1,6 @@
+---
+layout: nil
+---
 <?xml version="1.0" encoding="UTF-8"?>
 {% if page.xsl %}
   <?xml-stylesheet type="text/xsl" href="{{ "/sitemap.xsl" | absolute_url }}"?>
